@@ -21,6 +21,8 @@ local function loadfile(file)
   return load(buffer, "=" .. file, "bt", _G)
 end
 
+component.invoke(component.list("gpu")(), "set", 1, 1, "Starting OC-DOS....")
+
 local ok, err = loadfile("/io.lua")
 if not ok then
   if error then

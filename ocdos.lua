@@ -121,9 +121,24 @@ function module.unload(modName)
 end
 -----------------------------------------------------------------------------------------------------
 
+-- Load autoexec, if it exists --
+if fs.exists("C:/autoexec.lua") then
+  local ok, err = loadfile("C:/autoexec.lua")
+  if ok then pcall(ok) end -- We don't want the system to error out in autoexec.
+end
+-----------------------------------------------------------------------------------------------------
+
 -- Load the shell
-local ok, err = loadfile("A:/command.lua")
+local ok, err = loadfile("C:/command.lua")
 if not ok then
   error(err)
 end
 ok()
+
+term.clear()
+term.update()
+if os.sleep then
+  os.sleep(1)
+end
+
+-- Don't shut down; DOS never had ACPI support, at least not to my knowledge. init.lua will pullSignal infinitely. --

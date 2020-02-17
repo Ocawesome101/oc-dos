@@ -1,5 +1,9 @@
 -- Basic I/O facilities --
 
+if cmd then
+  error("System is already initialized")
+end
+
 local cproxy = component.proxy
 
 -- Improve the table API --
@@ -54,6 +58,9 @@ _G.term = {}
 
 local x,y = 1,1
 local w,h = gpu.getResolution()
+
+gpu.fill(1,1,w,h," ") -- Clear the screen
+
 function term.getCursorPos()
   return x,y
 end
@@ -83,7 +90,8 @@ end
 function term.scroll(amount)
   checkArg(1, amount, "number")
   local amount = amount or 1
-  gpu.copy(1,1+amount,w,h-amount,1,-1)
+  gpu.copy(1,1+amount,w,h-amount,0,-1)
+  gpu.fill(1,h - (amount - 1),w,1," ")
 end
 
 function term.clearLine()
@@ -131,7 +139,6 @@ function _G.print(...)
 end
 
 print("Starting OC-DOS....")
-
 -----------------------------------------------------------------------------------------------------
 
 -- Set up filesystems --
@@ -157,7 +164,6 @@ local drive_letters = {
   "Q:",
   "R:",
   "S:",
-  "T:",
   "U:",
   "V:",
   "W:",
@@ -166,11 +172,16 @@ local drive_letters = {
   "Z:"
 }
 
-local current_drive = "A:"
+local current_drive = "C:"
 
-local root_drive = component.list("filesystem")()
+local root_drive = ""
+if computer.getBootAddress then
+  root_drive = computer.getBootAddress()
+else
+  root_drive = component.list("filesystem")()
+end
 
-filesystems["A:"] = component.proxy(root_drive)
+filesystems["C:"] = component.proxy(root_drive)
 
 local function resolve_fs(path) -- Get the proper filesystem proxy for a path
   local drive = path:sub(1,2)
@@ -185,7 +196,7 @@ local function resolve_fs(path) -- Get the proper filesystem proxy for a path
 end
 
 local function ch_drive(drive)
-  if filesystems[drive] then
+  if filesystems[drive] ~= nil then
     current_drive = drive
   else
     return false, "No such drive"
@@ -194,17 +205,17 @@ end
 
 local function add_drive(drive_proxy)
   for _,v in pairs(filesystems) do
-    if v.address() == drive_proxy.address() then
+    if v.address() == drive_proxy.address() then -- The drive is already mounted
       return true
     end
   end
-  if filesystems["Z:"] then
-    return false, "Too many drives attached"
+  for i=1, #drive_letters, 1 do
+    if not filesystems[drive_letters[i]] then
+      filesystems[drive_letters[i]] = drive_proxy
+      return true
+    end
   end
-  if not filesystems[drive_letters[#filesystems + 1]] then
-    filesystems[drive_letters[#filesystems + 1]] = drive_proxy
-    filesystems[drive_letters[#filesystems]].component_address = drive_proxy.address()
-  end
+  return false, "Too many drives mounted" -- I don't know HOW you'd get 26 drives attached to a computer
 end
 
 local function rm_drive(drive)
@@ -276,46 +287,6 @@ function fs.drives() -- All mounted drives
   return rtn
 end
 
-function fs.list(dir)
-  checkArg(1, dir, "string")
-  local path, drive = path(dir, "remove")
-  return drive_exec(drive, "list", path)
-end
-
-function fs.remove(file)
-  checkArg(1, file, "string")
-  local file, drive = path(file, "remove")
-  return drive_exec(drive, "remove", file)
-end
-
-function fs.move(source, dest)
-  checkArg(1, source, "string")
-  checkArg(2, dest, "string")
-  local source, drive = path(source, "remove")
-  local dest, ddrive = path(dest, "remove")
-  if drive ~= ddrive then
-    return false, "Cannot move files between drives"
-  end
-  return drive_exec(drive, "rename", source, dest)
-end
-
-function fs.getLabel(drive)
-  checkArg(1, drive, "string")
-  return drive_exec(drive, "getLabel")
-end
-
-function fs.setLabel(drive, label)
-  checkArg(1, drive, "string")
-  checkArg(2, label, "string")
-  return drive_exec(drive, "setLabel", label)
-end
-
-function fs.exists(file)
-  checkArg(1, file, "string")
-  local file, drive = path(file, "remove")
-  return drive_exec(drive, "exists", file)
-end
-
 function fs.concat(path1, path2) -- Concatenate two file paths, with the proper number of slashes
   checkArg(1, path1, "string")
   checkArg(2, path2, "string")
@@ -328,7 +299,28 @@ function fs.concat(path1, path2) -- Concatenate two file paths, with the proper 
     path2 = path2:sub(2,1)
   end
   rtnPath = path1 .. "/" .. path2
+  if path2:sub(2,2) == ":" then -- If path2 starts with a drive reference, we don't want path1
+    rtnPath = path2
+  end
   return rtnPath
+end
+
+function fs.list(dir)
+  checkArg(1, dir, "string")
+  local path, drive = path(dir, "remove")
+  return drive_exec(drive, "list", path)
+end
+
+function fs.remove(file)
+  checkArg(1, file, "string")
+  local file, drive = path(file, "remove")
+  return drive_exec(drive, "remove", file)
+end
+
+function fs.exists(file)
+  checkArg(1, file, "string")
+  local file, drive = path(file, "remove")
+  return drive_exec(drive, "exists", file)
 end
 
 function fs.open(file, mode)
@@ -336,7 +328,7 @@ function fs.open(file, mode)
   checkArg(1, file, "string", "nil")
   local file, drive = path(file, "remove")
   local mode = mode or "r"
-  if not fs.exists(drive .. "/" .. file) then
+  if not fs.exists(fs.concat(drive, file)) and mode == "r" then
     return nil, "File not found"
   end
   local handle, status = drive_exec(drive, "open", file, mode)
@@ -359,6 +351,89 @@ function fs.open(file, mode)
   end
   return file
 end
+
+function fs.isDirectory(file)
+  checkArg(1, file, "string")
+  local file, drive = path(file, "remove")
+  if not fs.exists(fs.concat(drive, file)) then
+    return false, "File not found"
+  end
+  return drive_exec(drive, "isDirectory", file)
+end
+
+function fs.makeDirectory(file)
+  checkArg(1, file, "string")
+  local file, drive = path(file, "remove")
+  if fs.exists(file) then
+    return false, "File already exists"
+  end
+  return drive_exec(drive, "makeDirectory", file)
+end
+
+function fs.copy(src, dest)
+  checkArg(1, source, "string")
+  checkArg(2, dest, "string")
+  local source, drive = path(source, "remove")
+  local dest, ddrive = path(dest, "remove")
+  if not fs.exists(fs.concat(drive, source)) then
+    return false, "File not found"
+  end
+  local in_handle = fs.open(fs.concat(drive, source))
+  local out_handle = fs.open(fs.concat(ddrive, dest))
+  local in_buffer = ""
+  repeat
+    local data = in_handle:read()
+    in_buffer = in_buffer .. (data or "")
+  until not data
+  in_handle:close()
+  out_handle:write(in_buffer)
+  out_handle:close()
+end
+
+function fs.xcopy(src, dest)
+  checkArg(1, source, "string")
+  checkArg(2, dest, "string")
+  local source, drive = path(source, "remove")
+  local dest, ddrive = path(dest, "remove")
+  if fs.isDirectory(fs.concat(drive, source)) then
+    fs.makeDirectory()
+  else
+    fs.copy(fs.concat(drive, source), fs.concat(ddrive, dest))
+  end
+end
+
+function fs.move(source, dest)
+  checkArg(1, source, "string")
+  checkArg(2, dest, "string")
+  local source, drive = path(source, "remove")
+  local dest, ddrive = path(dest, "remove")
+  fs.copy(fs.concat(drive, source), fs.concat(ddrive, dest))
+  fs.remove(fs.concat(drive, source))
+end
+
+function fs.getLabel(drive)
+  checkArg(1, drive, "string")
+  return drive_exec(drive, "getLabel")
+end
+
+function fs.setLabel(drive, label)
+  checkArg(1, drive, "string")
+  checkArg(2, label, "string")
+  return drive_exec(drive, "setLabel", label)
+end
+
+function fs.lastModified(file)
+  checkArg(1, file, "string")
+  local file, drive = path(file, "remove")
+  return drive_exec(drive, "lastModified", file)
+end
+
+function fs.getAddress(drive)
+  checkArg(1, drive, "string")
+  if filesystems[drive] then
+    return filesystems[drive].address
+  end
+end
 -----------------------------------------------------------------------------------------------------
 
 -- Signal processing --
@@ -366,6 +441,8 @@ local pop = computer.pullSignal
 local psh = computer.pushSignal
 computer.pullSignal = nil -- We can't have people using this
 computer.pushSignal = nil -- Or this
+
+local computer = table.copy(computer)
 
 _G.dos = {}
 
@@ -395,18 +472,16 @@ function dos.pull(filter, timeout)
   checkArg(2, timeout, "number", "nil")
   local data = {}
   if timeout then
-    data = {ps(timeout)}
+    data = {pop()}
     if listeners[data[1]] then
       pcall(function()listeners[data[1]](table.unpack(data, 2, data.n))end)
     end
     if data[1] == filter or not filter then
       return table.unpack(data)
-    else
-      return
     end
   end
-  while data[1] ~= filter do
-    data = {ps()}
+  while true do
+    data = {pop()}
     if listeners[data[1]] then
       pcall(function()listeners[data[1]](table.unpack(data, 2, data.n))end)
     end
@@ -439,9 +514,13 @@ function dos.remove_event_listener(event)
     return false, "No event listener in place"
   end
 end
+
+function term.update()
+  dos.pull(nil, 0)
+end
 -----------------------------------------------------------------------------------------------------
 
--- A read function, now that event handling is done --
+-- read and sleep functions, now that event handling is done --
 function _G.read()
   local str = ""
   local w,h = term.getSize()
@@ -455,23 +534,24 @@ function _G.read()
       write("_")
     end
   end
+  redraw(true)
   while true do
     local e, _, id, altid = dos.pull()
     if e == "key_down" then
       if id == 8 then -- Backspace
-        str = str:sub(-2)
+        str = str:sub(1,-2)
       elseif id == 13 then -- Enter
         redraw(false)
         write("\n")
         return str
       elseif id == 0 then
-        if id == 200 then
+        if altid == 200 then
           str = str .. "^A"
-        elseif id == 208 then
+        elseif altid == 208 then
           str = str .. "^B"
-        elseif id == 205 then
+        elseif altid == 205 then
           str = str .. "^C"
-        elseif id == 203 then
+        elseif altid == 203 then
           str = str .. "^D"
         end
       else
@@ -479,17 +559,28 @@ function _G.read()
           str = str .. string.char(id)
         end
       end
+      redraw(true)
     end
-    redraw(true)
   end
 end
+
+function _G.sleep(time)
+  checkArg(1, time, "number")
+  local dest = dos.uptime() + time
+  repeat
+    local data = dos.pull(nil, time)
+  until dos.uptime() >= dest
+end
+
+os.sleep = _G.sleep
+
 -----------------------------------------------------------------------------------------------------
 
 -- Finally, load ocdos.lua and proceed to stage 2 --
 function loadfile(filename, mode, env)
   checkArg(1, filename, "string")
   checkArg(2, mode, "string", "table", "nil")
-  checkArg(3, env, "string", "nil")
+  checkArg(3, env, "table", "nil")
   local mode = mode or "bt"
   local env = env
   if env == nil and type(mode) == "table" then
@@ -511,7 +602,7 @@ function loadfile(filename, mode, env)
   return load(buffer, "=" .. filename, "bt", env)
 end
 
-local ok, err = loadfile("A:/ocdos.lua")
+local ok, err = loadfile("C:/ocdos.lua")
 if not ok then
   error(err)
 end
