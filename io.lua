@@ -172,7 +172,7 @@ local drive_letters = {
   "Z:"
 }
 
-local current_drive = "C:"
+local current_drive = "A:"
 
 local root_drive = ""
 if computer.getBootAddress then
@@ -181,7 +181,7 @@ else
   root_drive = component.list("filesystem")()
 end
 
-filesystems["C:"] = component.proxy(root_drive)
+filesystems["A:"] = component.proxy(root_drive)
 
 local function resolve_fs(path) -- Get the proper filesystem proxy for a path
   local drive = path:sub(1,2)
@@ -602,7 +602,7 @@ function loadfile(filename, mode, env)
   return load(buffer, "=" .. filename, "bt", env)
 end
 
-local ok, err = loadfile("C:/ocdos.lua")
+local ok, err = loadfile("A:/ocdos.lua")
 if not ok then
   error(err)
 end
