@@ -11,18 +11,18 @@ print("Volume in drive " .. fs.getDrive() .. " is " .. (fs.getLabel(fs.getDrive(
 print("Volume serial number is " .. fs.getAddress(fs.getDrive()):sub(1,6))
 
 local function printFiles(tFiles)
-  local linesPrinted = 2
+  local linesPrinted = 3
   local files = #tFiles
   if switches.p then
     for i=1, #tFiles, 1 do
       if tFiles[i]:sub(1,1) ~= "." or switches.a then
         print(((fs.isDirectory(dir .. "/" .. tFiles[i]) and "<DIR> ") or "<FILE>"), tFiles[i])
         linesPrinted = linesPrinted + 1
-        if linesPrinted+1 >= h then
+        if linesPrinted+2 >= h then
           linesPrinted = 0
-          print("Press any key to continue...")
+          print("Press any key to continue....")
           dos.pull("key_down")
-          print("[Continuing" .. fs.concat(fs.getDrive(), dir) .. "]")
+          print("[Continuing " .. fs.concat(fs.getDrive(), dir) .. "]")
         end
       end
     end

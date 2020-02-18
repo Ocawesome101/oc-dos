@@ -69,7 +69,7 @@ local function read()
     gpu.set(1, 1, file)
 
     gpu.set(1, h+1, (" "):rep(w))
-    gpu.set(1, h+1, "<f2=exit> <f5=save> <f6=refresh>")
+    gpu.set(1, h+1, "<f3=exit> <f5=save> <f6=refresh>")
     gpu.set(w - #tostring(line) - 6 - #lines, h+1, "Line " .. tostring(line) .. "/" .. tostring(#lines))
 
     local char = gpu.get(cursorX+1, cursorY)
@@ -148,7 +148,7 @@ local function read()
           end
         elseif altid == 63 then -- f5
           saveFile()
-        elseif altid == 60 then -- f2
+        elseif altid == 61 then -- f3
           term.clear()
           term.setCursorPos(1,1)
           break
