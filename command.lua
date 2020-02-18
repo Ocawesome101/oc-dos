@@ -49,7 +49,7 @@ function cmd.exec(program, ...)
   local paths = string.tokenize(path, ";")
   paths:insert(currentPwd)
   local programPath = ""
-  local rootdrive = "C:" -- The root drive. Probably has our programs on it
+  local rootdrive = "A:" -- The root drive. Probably has our programs on it
   local drive = fs.getDrive()
   for p=1, #paths, 1 do
     if fs.exists(drive .. paths[p] .. "/" ..program) then
