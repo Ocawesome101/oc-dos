@@ -123,13 +123,13 @@ end
 
 -- Load autoexec, if it exists --
 if fs.exists("C:/autoexec.lua") then
-  local ok, err = loadfile("C:/autoexec.lua")
+  local ok, err = loadfile("A:/autoexec.lua")
   if ok then pcall(ok) end -- We don't want the system to error out in autoexec.
 end
 -----------------------------------------------------------------------------------------------------
 
 -- Load the shell
-local ok, err = loadfile("C:/command.lua")
+local ok, err = loadfile("A:/command.lua")
 if not ok then
   error(err)
 end
@@ -141,4 +141,4 @@ if os.sleep then
   os.sleep(1)
 end
 
--- Don't shut down; DOS never had ACPI support, at least not to my knowledge. init.lua will pullSignal infinitely. --
+-- Don't shut down if command.lua exits; DOS never had ACPI support, at least not to my knowledge. init.lua will pullSignal infinitely. --
