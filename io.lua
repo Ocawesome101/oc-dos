@@ -205,7 +205,7 @@ end
 
 local function add_drive(drive_proxy)
   for _,v in pairs(filesystems) do
-    if v.address() == drive_proxy.address() then -- The drive is already mounted
+    if v.address == drive_proxy.address then -- The drive is already mounted
       return true
     end
   end
@@ -447,16 +447,16 @@ local computer = table.copy(computer)
 _G.dos = {}
 
 local listeners = {
-  ["component_added"] = function(addr, type)
-    if type == "filesystem" then
+  ["component_added"] = function(addr, ctype)
+    if ctype == "filesystem" then
       add_drive(cproxy(addr))
     end
   end,
-  ["component_removed"] = function(addr, type)
-    if type == "filesystem" then
+  ["component_removed"] = function(addr, ctype)
+    if ctype == "filesystem" then
       local drive = ""
       for k,v in pairs(filesystems) do
-        if v.component_address == addr then
+        if v.address == addr then
           drive = k
         end
       end
