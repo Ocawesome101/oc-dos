@@ -1,5 +1,7 @@
 -- Load OC-DOS --
 
+_G._START = computer.uptime()
+
 local list, invoke = component.list, component.invoke
 if not computer.getBootAddress then
   computer.getBootAddress = function()return nil end

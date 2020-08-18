@@ -5,6 +5,8 @@ if cmd then
   return false
 end
 
+print("Booted in " .. dos.uptime() - _START .. " seconds.")
+
 _G.cmd = {}
 
 local exit = false

@@ -287,22 +287,8 @@ function fs.drives() -- All mounted drives
   return rtn
 end
 
-function fs.concat(path1, path2) -- Concatenate two file paths, with the proper number of slashes
-  checkArg(1, path1, "string")
-  checkArg(2, path2, "string")
-  local rtnPath = ""
-  -- Remove all trailing slashes
-  while path1:sub(-1) == "/" do
-    path1 = path1:sub(1,-2)
-  end
-  while path2:sub(1,1) == "/" do
-    path2 = path2:sub(2,1)
-  end
-  rtnPath = path1 .. "/" .. path2
-  if path2:sub(2,2) == ":" then -- If path2 starts with a drive reference, we don't want path1
-    rtnPath = path2
-  end
-  return rtnPath
+function fs.concat(...) -- Concatenate file paths, with the proper number of slashes
+  return table.concat(table.pack(...), "/"):gsub("[/\\]+", "/")
 end
 
 function fs.list(dir)
@@ -329,7 +315,7 @@ function fs.open(file, mode)
   local file, drive = path(file, "remove")
   local mode = mode or "r"
   if not fs.exists(fs.concat(drive, file)) and mode == "r" then
-    return nil, "File not found"
+    return nil, fs.concat(drive, file) .. ": File not found"
   end
   local handle, status = drive_exec(drive, "open", file, mode)
   if not handle then
@@ -527,11 +513,11 @@ function _G.read()
   local x,y = term.getCursorPos()
   local function redraw(c)
     term.setCursorPos(x,y)
-    write((" "):rep(w - x))
-    term.setCursorPos(x,y)
     write(str)
     if c then
-      write("_")
+      write("_ ")
+    else
+      write(" ")
     end
   end
   redraw(true)
